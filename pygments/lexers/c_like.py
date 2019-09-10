@@ -10,6 +10,7 @@
 """
 
 import re
+import itertools as it
 
 from pygments.lexer import RegexLexer, include, bygroups, inherit, words, \
     default
@@ -338,30 +339,33 @@ class OpenclLexer(CLexer):
     aliases = ['opencl', 'cl']
     mimetypes = ['text/x-opencl-csrc']
     
-    ftypes = ('char', 'short', 'int', 'long', 
+    ftypes = set(('char', 'short', 'int', 'long', 
              'uchar', 'ushort', 'uint', 'ulong', 
-             'half', 'float', 'double')
-    components = ('', '2', '4', '8', '16')
-    vector_types = set('{}{}'.format(ftype, component) 
-                        for ftype in ftypes for component in components)
+             'half', 'float', 'double'))
+    components = set(('', '2', '3', '4', '8', '16'))
+    vector_types = set('{}{}'.format(tp, comp) for (tp, comp) in
+                        it.product(ftypes, components))
+    print vector_types
     img_types = set(('image2d_t', 'image3d_t', 'image2d_array_t', 
                      'image1d_t', 'image1d_buffer_t', 'image1d_array_t'))
     convert_modes = set(('', '_rte', '_rtz', '_rtp', '_rtn',
-                        '_sat', '_sat_rte', '_sat_rtz', '_sat_rtp', 'sat_rtn'))
-    convert_functions = set(('convert_{}{}'.format(tp, mode) for tp in vector_types 
-                                                             for mode in convert_modes))
+                        '_sat', '_sat_rte', '_sat_rtz', '_sat_rtp', '_sat_rtn'))
+    convert_functions = set(('convert_{}{}'.format(tp, mode) for (tp, mode) in 
+                        it.product(vector_types, convert_modes)))
     as_functions = set(('as_{}'.format(tp) for tp in vector_types))
+    wi_functions = set(('get_work_dim', 'get_global_size', 'get_global_id',
+                        'get_local_size', 'get_local_id', 'get_num_groups', 'get_group_id'))
 
     function_qualifiers = set(('__kernel', '__attribute__'))
     variable_qualifiers = set(('__global', '__local', '__constant', '__private',
                                '__read_only', '__write_only', '__read_write'))
-    cl_types = vector_types + img_types
-    variables = set(('lid', 'gid', 'L', 'G'))
+    cl_types = vector_types.union(img_types)
     functions = set(('vec_type_hint', 'opencl_unroll_hint',
                      'work_group_size_hint', 'reqd_work_group_size',
                      'aligned', 'packed', 'endian',
                      'async_work_group_copy', 'async_work_group_strided_copy',
-                     'wait_group_events', 'prefetch')) + convert_functions + as_functions
+                     'wait_group_events', 'prefetch'))\
+                             .union(convert_functions).union(as_functions).union(wi_functions)
 
     def get_tokens_unprocessed(self, text):
         for index, token, value in CLexer.get_tokens_unprocessed(self, text):
@@ -370,12 +374,10 @@ class OpenclLexer(CLexer):
                     token = Keyword.Type
                 elif value in self.cl_types:
                     token = Keyword.Type
-                elif value in self.variables:
-                    token = Name.Builtin
                 elif value in self.function_qualifiers:
                     token = Keyword.Reserved
                 elif value in self.functions:
-                    token = Name.Function
+                    token = Name.Builtin
             yield index, token, value
 
 
